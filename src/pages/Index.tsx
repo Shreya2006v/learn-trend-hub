@@ -18,59 +18,47 @@ const Index = () => {
   const [analysis, setAnalysis] = useState<AnalysisData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const analyzeTopic = () => {
+  const analyzeTopic = async () => {
     if (!topic.trim()) return;
 
     setIsLoading(true);
     
-    // Simulate analysis - In a real app, this would call an AI API
-    setTimeout(() => {
-      const mockAnalysis: AnalysisData = {
-        overview: [
-          `${topic} is a rapidly evolving field that combines theoretical knowledge with practical applications`,
-          "It plays a crucial role in modern technology infrastructure and digital transformation",
-          "Used across various industries from healthcare to finance, entertainment to manufacturing"
-        ],
-        modernApplications: [
-          "Cloud-native applications and microservices architecture",
-          "AI-powered automation and intelligent systems",
-          "Real-time data processing and analytics platforms",
-          "IoT integration and edge computing solutions"
-        ],
-        importance: [
-          "Enables businesses to scale efficiently and reduce operational costs",
-          "Powers innovation in emerging technologies and digital products",
-          "Critical for competitive advantage in the modern digital economy",
-          "Drives efficiency improvements and enhanced user experiences"
-        ],
-        skillsTools: [
-          "Core programming languages: Python, JavaScript, or relevant language",
-          "Version control systems (Git) and collaborative development tools",
-          "Cloud platforms: AWS, Azure, or Google Cloud",
-          "Container orchestration: Docker, Kubernetes",
-          "Testing frameworks and CI/CD pipelines"
-        ],
-        projectIdeas: [
-          "Build a personal portfolio website showcasing your skills",
-          "Create an automation tool for a common task in your workflow",
-          "Develop a mobile-responsive web application with modern framework",
-          "Contribute to open-source projects in this technology area",
-          "Build a proof-of-concept demonstrating key concepts"
-        ],
-        skillGap: [
-          "Foundation: Understanding core principles and best practices",
-          "Hands-on experience with industry-standard tools and frameworks",
-          "Problem-solving abilities with real-world scenarios",
-          "Collaboration and communication skills for team environments",
-          "Continuous learning mindset to stay current with rapid changes"
-        ]
-      };
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-topic`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ topic: topic.trim() })
+        }
+      );
 
-      setAnalysis(mockAnalysis);
-      setIsLoading(false);
+      if (!response.ok) {
+        const error = await response.json();
+        if (response.status === 429) {
+          toast.error("Rate limit exceeded. Please try again in a moment.");
+        } else if (response.status === 402) {
+          toast.error("AI credits depleted. Please add more credits to continue.");
+        } else {
+          toast.error(error.error || "Failed to analyze topic. Please try again.");
+        }
+        setIsLoading(false);
+        return;
+      }
+
+      const data = await response.json();
+      setAnalysis(data.analysis);
       toast.success(`Analysis complete for ${topic}!`);
-    }, 1500);
+    } catch (error) {
+      console.error("Error analyzing topic:", error);
+      toast.error("Network error. Please check your connection and try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
+
 
   const sections = analysis ? [
     { title: "Topic Overview", icon: Lightbulb, content: analysis.overview },
