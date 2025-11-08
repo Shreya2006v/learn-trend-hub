@@ -1,8 +1,12 @@
-import { useState } from "react";
-import { Lightbulb, Rocket, Wrench, TrendingUp, Target, GraduationCap } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { Lightbulb, Rocket, Wrench, TrendingUp, Target, GraduationCap, Brain, LogOut } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import TopicInput from "@/components/TopicInput";
 import AnalysisSection from "@/components/AnalysisSection";
+import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import type { User } from '@supabase/supabase-js';
 
 interface AnalysisData {
   overview: string[];
@@ -14,9 +18,40 @@ interface AnalysisData {
 }
 
 const Index = () => {
+  const navigate = useNavigate();
+  const [user, setUser] = useState<User | null>(null);
   const [topic, setTopic] = useState("");
   const [analysis, setAnalysis] = useState<AnalysisData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setUser(session?.user ?? null);
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    toast.success("Signed out successfully");
+  };
+
+  const openMindMap = () => {
+    if (!user) {
+      toast.error("Please sign in to create mind maps");
+      navigate("/auth");
+      return;
+    }
+    navigate(`/mind-map${topic ? `?topic=${encodeURIComponent(topic)}` : ''}`);
+  };
 
   const analyzeTopic = async () => {
     if (!topic.trim()) return;
@@ -73,23 +108,54 @@ const Index = () => {
     <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
       <header className="border-b border-border/50 bg-card/50 backdrop-blur-sm sticky top-0 z-10">
         <div className="container mx-auto px-4 py-6">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-            Tech Skill Analyzer
-          </h1>
-          <p className="text-muted-foreground mt-2">
-            Discover modern applications, skills needed, and project ideas for any technology topic
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                Tech Skill Analyzer
+              </h1>
+              <p className="text-muted-foreground mt-2">
+                Discover modern applications, skills needed, and project ideas for any technology topic
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {user ? (
+                <>
+                  <span className="text-sm text-muted-foreground hidden sm:inline">
+                    {user.email}
+                  </span>
+                  <Button variant="outline" size="icon" onClick={handleSignOut}>
+                    <LogOut className="h-4 w-4" />
+                  </Button>
+                </>
+              ) : (
+                <Button variant="outline" onClick={() => navigate("/auth")}>
+                  Sign In
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
       </header>
 
       <main className="container mx-auto px-4 py-12">
-        <div className="mb-12">
+        <div className="mb-12 space-y-4">
           <TopicInput
             value={topic}
             onChange={setTopic}
             onSubmit={analyzeTopic}
             isLoading={isLoading}
           />
+          
+          <div className="flex justify-center">
+            <Button
+              onClick={openMindMap}
+              variant="outline"
+              className="gap-2"
+            >
+              <Brain className="h-4 w-4" />
+              Create Learning Mind Map
+            </Button>
+          </div>
         </div>
 
         {isLoading && (
