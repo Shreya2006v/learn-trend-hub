@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Lightbulb, Rocket, Wrench, TrendingUp, Target, GraduationCap, Brain, LogOut } from "lucide-react";
+import { Lightbulb, Rocket, Wrench, TrendingUp, Target, GraduationCap, Brain, LogOut, MessageSquare } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import TopicInput from "@/components/TopicInput";
 import AnalysisSection from "@/components/AnalysisSection";
@@ -53,10 +53,39 @@ const Index = () => {
     navigate(`/mind-map${topic ? `?topic=${encodeURIComponent(topic)}` : ''}`);
   };
 
+  const trackUserInterest = async (topicName: string) => {
+    if (!user) return;
+
+    const { data: existing } = await supabase
+      .from('user_interests')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('topic', topicName)
+      .single();
+
+    if (existing) {
+      await supabase
+        .from('user_interests')
+        .update({
+          search_count: existing.search_count + 1,
+          last_searched_at: new Date().toISOString()
+        })
+        .eq('id', existing.id);
+    } else {
+      await supabase
+        .from('user_interests')
+        .insert([{ user_id: user.id, topic: topicName }]);
+    }
+  };
+
   const analyzeTopic = async () => {
     if (!topic.trim()) return;
 
     setIsLoading(true);
+    
+    if (user) {
+      await trackUserInterest(topic.trim());
+    }
     
     try {
       const response = await fetch(
@@ -146,7 +175,7 @@ const Index = () => {
             isLoading={isLoading}
           />
           
-          <div className="flex justify-center">
+          <div className="flex justify-center gap-3">
             <Button
               onClick={openMindMap}
               variant="outline"
@@ -154,6 +183,21 @@ const Index = () => {
             >
               <Brain className="h-4 w-4" />
               Create Learning Mind Map
+            </Button>
+            <Button
+              onClick={() => {
+                if (!user) {
+                  toast.error("Please sign in to use the chatbot");
+                  navigate("/auth");
+                  return;
+                }
+                navigate("/chatbot");
+              }}
+              variant="outline"
+              className="gap-2"
+            >
+              <MessageSquare className="h-4 w-4" />
+              AI Learning Assistant
             </Button>
           </div>
         </div>
