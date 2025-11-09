@@ -1,6 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.80.0';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,98 +13,120 @@ serve(async (req) => {
   }
 
   try {
-    const { message, conversationId, assistanceType, userInterests } = await req.json();
+    const { message, conversationId, assistanceType, userId } = await req.json();
     
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    
+    if (!LOVABLE_API_KEY) {
+      throw new Error('LOVABLE_API_KEY is not configured');
+    }
 
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get conversation history
-    const { data: messages } = await supabase
+    // Fetch user interests to personalize responses
+    const { data: interests } = await supabase
+      .from('user_interests')
+      .select('topic, search_count')
+      .eq('user_id', userId)
+      .order('search_count', { ascending: false })
+      .limit(5);
+
+    // Fetch previous messages in this conversation
+    const { data: previousMessages } = await supabase
       .from('chat_messages')
       .select('role, content')
       .eq('conversation_id', conversationId)
       .order('created_at', { ascending: true })
-      .limit(20);
+      .limit(10);
 
-    const conversationHistory = messages || [];
-
-    // Build system prompt based on assistance type and user interests
-    let systemPrompt = `You are a personalized learning assistant. `;
+    // Build context based on assistance type and user interests
+    let systemPrompt = '';
     
-    if (userInterests && userInterests.length > 0) {
-      systemPrompt += `The user has shown interest in: ${userInterests.join(', ')}. `;
-    }
-
     switch (assistanceType) {
       case 'academic':
-        systemPrompt += `Focus on providing academic assistance, explaining concepts clearly, and suggesting study resources. Keep responses concise and educational.`;
+        systemPrompt = `You are a personalized academic assistant. Help the user with their studies, explain concepts clearly, and provide structured learning paths. Use visual aids and examples when helpful.`;
         break;
       case 'opportunities':
-        systemPrompt += `Focus on suggesting real-world opportunities like hackathons, ideathons, internships, and job opportunities related to their interests. Provide specific, actionable recommendations with details about how to apply or participate. Include relevant deadlines when possible.`;
+        systemPrompt = `You are a career and opportunity advisor. Based on the user's interests in ${interests?.map(i => i.topic).join(', ')}, suggest relevant hackathons, ideathons, internships, and job opportunities. Provide specific, actionable recommendations with links when possible.`;
         break;
-      case 'projects':
-        systemPrompt += `Focus on suggesting practical project ideas that align with their interests. Provide step-by-step guidance and technical recommendations.`;
-        break;
+      case 'general':
       default:
-        systemPrompt += `Provide helpful, personalized assistance. Keep responses clear, concise, and actionable.`;
+        systemPrompt = `You are a helpful and friendly learning assistant. Provide clear, concise, and personalized responses based on the user's learning journey.`;
     }
+
+    if (interests && interests.length > 0) {
+      systemPrompt += `\n\nUser's main interests: ${interests.map(i => i.topic).join(', ')}.`;
+    }
+
+    systemPrompt += `\n\nWhen helpful, suggest relevant images or diagrams to explain concepts. Keep responses concise and focused.`;
+
+    // Build messages array
+    const messages = [
+      { role: 'system', content: systemPrompt },
+      ...(previousMessages || []).map(m => ({ role: m.role, content: m.content })),
+      { role: 'user', content: message }
+    ];
+
+    console.log('Calling Lovable AI with assistance type:', assistanceType);
 
     // Call Lovable AI
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${lovableApiKey}`,
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          ...conversationHistory,
-          { role: 'user', content: message }
-        ],
+        messages: messages,
+        temperature: 0.7,
+        max_tokens: 1000,
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Lovable AI error:', response.status, errorText);
+      console.error('AI API Error:', response.status, errorText);
       
       if (response.status === 429) {
         return new Response(
           JSON.stringify({ error: 'Rate limit exceeded. Please try again in a moment.' }),
           { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
-      } else if (response.status === 402) {
+      }
+      if (response.status === 402) {
         return new Response(
-          JSON.stringify({ error: 'AI credits depleted. Please add more credits.' }),
+          JSON.stringify({ error: 'AI credits depleted. Please add more credits to continue.' }),
           { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
       
-      throw new Error(`AI request failed: ${errorText}`);
+      throw new Error(`AI API error: ${response.status}`);
     }
 
     const data = await response.json();
-    const assistantMessage = data.choices[0].message.content;
+    const aiResponse = data.choices[0].message.content;
 
-    // Save messages to database
-    const { error: insertError } = await supabase
-      .from('chat_messages')
-      .insert([
-        { conversation_id: conversationId, role: 'user', content: message },
-        { conversation_id: conversationId, role: 'assistant', content: assistantMessage }
-      ]);
+    console.log('AI response received successfully');
 
-    if (insertError) {
-      console.error('Error saving messages:', insertError);
-    }
+    // Save user message
+    await supabase.from('chat_messages').insert({
+      conversation_id: conversationId,
+      role: 'user',
+      content: message,
+    });
+
+    // Save AI response
+    await supabase.from('chat_messages').insert({
+      conversation_id: conversationId,
+      role: 'assistant',
+      content: aiResponse,
+    });
 
     return new Response(
-      JSON.stringify({ response: assistantMessage }),
+      JSON.stringify({ response: aiResponse }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
