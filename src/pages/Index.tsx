@@ -4,11 +4,17 @@ import { Lightbulb, Rocket, Wrench, TrendingUp, Target, GraduationCap, Brain, Lo
 import { supabase } from "@/integrations/supabase/client";
 import TopicInput from "@/components/TopicInput";
 import AnalysisSection from "@/components/AnalysisSection";
+import RelevanceChecker from "@/components/RelevanceChecker";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import type { User } from '@supabase/supabase-js';
 
 interface AnalysisData {
+  relevance: {
+    status: "current" | "declining" | "outdated";
+    explanation: string;
+    replacementTechnologies?: string[];
+  };
   overview: string[];
   modernApplications: string[];
   importance: string[];
@@ -210,15 +216,19 @@ const Index = () => {
         )}
 
         {!isLoading && analysis && (
-          <div className="grid md:grid-cols-2 gap-6 animate-in fade-in duration-500">
-            {sections.map((section, index) => (
-              <AnalysisSection
-                key={index}
-                title={section.title}
-                icon={section.icon}
-                content={section.content}
-              />
-            ))}
+          <div className="space-y-6 animate-in fade-in duration-500">
+            <RelevanceChecker relevance={analysis.relevance} topic={topic} />
+            
+            <div className="grid md:grid-cols-2 gap-6">
+              {sections.map((section, index) => (
+                <AnalysisSection
+                  key={index}
+                  title={section.title}
+                  icon={section.icon}
+                  content={section.content}
+                />
+              ))}
+            </div>
           </div>
         )}
 

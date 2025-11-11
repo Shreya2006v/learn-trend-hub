@@ -29,29 +29,35 @@ serve(async (req) => {
       );
     }
 
-    const systemPrompt = `You are a technology skills analyzer. Your task is to analyze technology topics and provide structured, actionable insights.
+    const systemPrompt = `You are a technology skills analyzer with expertise in assessing topic relevance in modern technology. Your task is to analyze technology topics and provide structured, actionable insights.
 
-When analyzing a topic, provide exactly 6 sections with 3-5 bullet points each:
-1. Topic Overview - Brief introduction and context
-2. Modern Applications - Where and how it's used today
-3. Importance & Impact - Why it matters in today's tech landscape
-4. Skills & Tools to Learn - Specific technologies, languages, and frameworks
-5. Project Ideas - Concrete projects from beginner to advanced
-6. Skill Gap Analysis - What learners need to acquire to excel
+CRITICAL: First assess if the topic is currently relevant or outdated in modern technology.
 
-Be specific, practical, and beginner-friendly. Focus on actionable advice and real-world applications.`;
+When analyzing a topic, provide exactly 7 sections:
+1. Relevance Assessment - Determine if topic is current, declining, or outdated. If outdated, list replacement technologies.
+2. Topic Overview - Brief introduction and context
+3. Modern Applications - Where and how it's used today (or was used if outdated)
+4. Importance & Impact - Why it matters (or historical significance if outdated)
+5. Skills & Tools to Learn - Specific technologies, languages, and frameworks (or modern alternatives if outdated)
+6. Project Ideas - Concrete projects from beginner to advanced
+7. Skill Gap Analysis - What learners need to acquire to excel
+
+Be specific, practical, and honest about relevance. Focus on actionable advice and real-world applications.`;
 
     const userPrompt = `Analyze the following technology topic: "${topic}"
 
+FIRST: Assess relevance in 2025 - Is this topic current, declining, or outdated? If outdated, what modern technologies replaced it?
+
 Provide a comprehensive analysis covering:
+- Relevance Assessment (current status, adoption rate, if outdated list 3-5 replacement technologies with brief explanations)
 - Topic Overview (3-4 points)
-- Modern Applications (4-5 points)
+- Modern Applications (4-5 points, or historical uses if outdated)
 - Importance & Impact (3-4 points)
-- Skills & Tools to Learn (4-5 points with specific tools/languages)
+- Skills & Tools to Learn (4-5 points with specific tools/languages, or modern alternatives)
 - Project Ideas (4-5 concrete project suggestions)
 - Skill Gap Analysis (4-5 points about what to learn)
 
-Make it practical, specific, and actionable.`;
+Make it practical, specific, and actionable. Be honest about relevance.`;
 
     console.log("Calling AI Gateway for topic:", topic);
 
@@ -76,6 +82,27 @@ Make it practical, specific, and actionable.`;
               parameters: {
                 type: "object",
                 properties: {
+                  relevance: {
+                    type: "object",
+                    properties: {
+                      status: {
+                        type: "string",
+                        enum: ["current", "declining", "outdated"],
+                        description: "Current relevance status of the topic"
+                      },
+                      explanation: {
+                        type: "string",
+                        description: "Brief explanation of the relevance status"
+                      },
+                      replacementTechnologies: {
+                        type: "array",
+                        items: { type: "string" },
+                        description: "Modern technologies that replaced this (if outdated/declining), each with brief explanation"
+                      }
+                    },
+                    required: ["status", "explanation"],
+                    description: "Relevance assessment in modern technology landscape"
+                  },
                   overview: {
                     type: "array",
                     items: { type: "string" },
@@ -107,7 +134,7 @@ Make it practical, specific, and actionable.`;
                     description: "4-5 points about skill gap analysis"
                   }
                 },
-                required: ["overview", "modernApplications", "importance", "skillsTools", "projectIdeas", "skillGap"],
+                required: ["relevance", "overview", "modernApplications", "importance", "skillsTools", "projectIdeas", "skillGap"],
                 additionalProperties: false
               }
             }
