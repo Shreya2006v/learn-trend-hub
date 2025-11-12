@@ -34,7 +34,12 @@ serve(async (req) => {
 CRITICAL: First assess if the topic is currently relevant or outdated in modern technology.
 
 When analyzing a topic, provide exactly 7 sections:
-1. Relevance Assessment - Determine if topic is current, declining, or outdated. If outdated, list replacement technologies.
+1. Relevance Assessment - Determine if topic is current, declining, or outdated. Include:
+   - Current adoption rate and trend (increasing/stable/declining)
+   - Major companies and industries using it
+   - Practical usage frequency in modern projects
+   - If outdated/declining, list replacement technologies with detailed explanations
+   - Why new technologies are better (if applicable)
 2. Topic Overview - Brief introduction and context
 3. Modern Applications - Where and how it's used today (or was used if outdated)
 4. Importance & Impact - Why it matters (or historical significance if outdated)
@@ -49,7 +54,7 @@ Be specific, practical, and honest about relevance. Focus on actionable advice a
 FIRST: Assess relevance in 2025 - Is this topic current, declining, or outdated? If outdated, what modern technologies replaced it?
 
 Provide a comprehensive analysis covering:
-- Relevance Assessment (current status, adoption rate, if outdated list 3-5 replacement technologies with brief explanations)
+- Relevance Assessment (current status, adoption rate percentage, trend direction, 3-5 major companies/industries using it, practical usage frequency in modern projects, if outdated/declining list 3-5 replacement technologies with detailed explanations of why they're better)
 - Topic Overview (3-4 points)
 - Modern Applications (4-5 points, or historical uses if outdated)
 - Importance & Impact (3-4 points)
@@ -57,7 +62,7 @@ Provide a comprehensive analysis covering:
 - Project Ideas (4-5 concrete project suggestions)
 - Skill Gap Analysis (4-5 points about what to learn)
 
-Make it practical, specific, and actionable. Be honest about relevance.`;
+Make it practical, specific, and actionable. Be honest about relevance. For replacement technologies, explain why they're superior.`;
 
     console.log("Calling AI Gateway for topic:", topic);
 
@@ -94,13 +99,32 @@ Make it practical, specific, and actionable. Be honest about relevance.`;
                         type: "string",
                         description: "Brief explanation of the relevance status"
                       },
-                      replacementTechnologies: {
+                      adoptionRate: {
+                        type: "string",
+                        description: "Estimated adoption rate percentage or trend (e.g., '75% adoption', 'rapidly growing', 'declining')"
+                      },
+                      companiesUsingIt: {
                         type: "array",
                         items: { type: "string" },
-                        description: "Modern technologies that replaced this (if outdated/declining), each with brief explanation"
+                        description: "3-5 major companies or industries actively using this technology"
+                      },
+                      practicalUsage: {
+                        type: "string",
+                        description: "How often and where it's practically used in modern projects and companies"
+                      },
+                      replacementTechnologies: {
+                        type: "array",
+                        items: { 
+                          type: "object",
+                          properties: {
+                            name: { type: "string", description: "Name of the replacement technology" },
+                            reason: { type: "string", description: "Why this technology is better than the old one" }
+                          }
+                        },
+                        description: "Modern technologies that replaced this (if outdated/declining) with explanations"
                       }
                     },
-                    required: ["status", "explanation"],
+                    required: ["status", "explanation", "adoptionRate", "practicalUsage"],
                     description: "Relevance assessment in modern technology landscape"
                   },
                   overview: {

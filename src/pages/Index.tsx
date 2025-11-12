@@ -9,11 +9,19 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import type { User } from '@supabase/supabase-js';
 
+interface ReplacementTech {
+  name: string;
+  reason: string;
+}
+
 interface AnalysisData {
   relevance: {
     status: "current" | "declining" | "outdated";
     explanation: string;
-    replacementTechnologies?: string[];
+    adoptionRate: string;
+    companiesUsingIt?: string[];
+    practicalUsage: string;
+    replacementTechnologies?: ReplacementTech[];
   };
   overview: string[];
   modernApplications: string[];
