@@ -121,7 +121,11 @@ const Chatbot = () => {
   };
 
   const sendMessage = async () => {
-    if (!input.trim() || !conversationId || !user) return;
+    if (!input.trim() || !user) return;
+    if (!conversationId) {
+      toast.message("Preparing chat... please try again in a moment.");
+      return;
+    }
 
     setIsLoading(true);
     const messageText = input;
@@ -272,7 +276,7 @@ const Chatbot = () => {
               <Textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                onKeyPress={handleKeyPress}
+                onKeyDown={handleKeyPress}
                 placeholder="Type your message..."
                 className="resize-none"
                 rows={2}
