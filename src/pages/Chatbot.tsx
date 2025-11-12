@@ -127,6 +127,15 @@ const Chatbot = () => {
     const messageText = input;
     setInput("");
 
+    // Optimistically add the user message so UI feels responsive even if realtime is delayed
+    const tempUserMsg: Message = {
+      id: `temp-${Date.now()}`,
+      role: 'user',
+      content: messageText,
+      created_at: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, tempUserMsg]);
+
     try {
       const { data, error } = await supabase.functions.invoke('personalized-chat', {
         body: {
@@ -141,6 +150,15 @@ const Chatbot = () => {
 
       if (data?.error) {
         toast.error(data.error);
+      } else if (data?.response) {
+        // Immediately show assistant reply; DB will persist it in background
+        const tempAssistantMsg: Message = {
+          id: `temp-assistant-${Date.now()}`,
+          role: 'assistant',
+          content: data.response,
+          created_at: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, tempAssistantMsg]);
       }
     } catch (error) {
       console.error('Error sending message:', error);
